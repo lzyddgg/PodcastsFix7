@@ -1,6 +1,3 @@
-THEOS_DEVICE_IP ?= 127.0.0.1
-THEOS_PACKAGE_SCHEME = rootless
-
 export THEOS ?= $(HOME)/theos
 
 TARGET := iphone:clang:latest:7.0

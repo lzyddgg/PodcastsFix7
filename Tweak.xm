@@ -7,7 +7,6 @@ static NSURL *PF7RewriteURL(NSURL *url) {
     NSString *host   = [[url host] lowercaseString] ?: @"";
     NSString *path   = [url path] ?: @"";
 
-    // 只处理和播客/itunes目录明显相关的请求
     BOOL looksRelevantHost =
         [host isEqualToString:@"itunes.apple.com"] ||
         [host isEqualToString:@"ax.itunes.apple.com"] ||
@@ -24,52 +23,47 @@ static NSURL *PF7RewriteURL(NSURL *url) {
 
     BOOL changed = NO;
 
-    // 1) 修 itunes 旧 host
     if ([host isEqualToString:@"ax.itunes.apple.com"] ||
         [host hasSuffix:@".itunes.apple.com"]) {
         comp.host = @"itunes.apple.com";
         changed = YES;
     }
 
-    // 2) http -> https
     if ([scheme isEqualToString:@"http"]) {
         comp.scheme = @"https";
         changed = YES;
     }
 
-    // 3) 对常见可用接口优先修正
     if ([path isEqualToString:@"/search"] || [path isEqualToString:@"/lookup"]) {
-        if (![comp.host.lowercaseString isEqualToString:@"itunes.apple.com"]) {
+        if (![[[comp host] lowercaseString] isEqualToString:@"itunes.apple.com"]) {
             comp.host = @"itunes.apple.com";
             changed = YES;
         }
-        if (![comp.scheme.lowercaseString isEqualToString:@"https"]) {
+        if (![[[comp scheme] lowercaseString] isEqualToString:@"https"]) {
             comp.scheme = @"https";
             changed = YES;
         }
     }
 
-    // 4) 一些老客户端可能会访问 podcast 相关页面或 feed 跳转
-    // 不强改 path，只做 host/scheme 级别修复，避免把请求修坏
     if (!changed) return nil;
 
-    NSURL *newURL = [comp URL];
-    return newURL;
+    return [comp URL];
 }
 
 static NSURLRequest *PF7RewriteRequest(NSURLRequest *req) {
     if (!req) return req;
 
-    NSURL *newURL = PF7RewriteURL(req.URL);
-    if (!newURL || [newURL isEqual:req.URL]) {
+    NSURL *oldURL = [req URL];
+    NSURL *newURL = PF7RewriteURL(oldURL);
+    if (!newURL || [newURL isEqual:oldURL]) {
         return req;
     }
 
-    NSMutableURLRequest *mutable = [req mutableCopy];
-    [mutable setURL:newURL];
-    [mutable setValue:nil forHTTPHeaderField:@"Host"];
-    NSLog(@"[PodcastsFix7] %@ -> %@", req.URL.absoluteString, newURL.absoluteString);
-    return mutable;
+    NSMutableURLRequest *mutableReq = [req mutableCopy];
+    [mutableReq setURL:newURL];
+    [mutableReq setValue:nil forHTTPHeaderField:@"Host"];
+    NSLog(@"[PodcastsFix7] %@ -> %@", [oldURL absoluteString], [newURL absoluteString]);
+    return mutableReq;
 }
 
 %hook NSURLRequest
@@ -77,7 +71,7 @@ static NSURLRequest *PF7RewriteRequest(NSURLRequest *req) {
 + (id)requestWithURL:(NSURL *)URL {
     NSURL *newURL = PF7RewriteURL(URL);
     if (newURL) {
-        NSLog(@"[PodcastsFix7] requestWithURL rewrite: %@ -> %@", URL.absoluteString, newURL.absoluteString);
+        NSLog(@"[PodcastsFix7] requestWithURL rewrite: %@ -> %@", [URL absoluteString], [newURL absoluteString]);
         return %orig(newURL);
     }
     return %orig(URL);
@@ -88,28 +82,28 @@ static NSURLRequest *PF7RewriteRequest(NSURLRequest *req) {
      timeoutInterval:(NSTimeInterval)timeoutInterval {
     NSURL *newURL = PF7RewriteURL(URL);
     if (newURL) {
-        NSLog(@"[PodcastsFix7] requestWithURL:cachePolicy:timeout rewrite: %@ -> %@", URL.absoluteString, newURL.absoluteString);
+        NSLog(@"[PodcastsFix7] requestWithURL:cachePolicy:timeout rewrite: %@ -> %@", [URL absoluteString], [newURL absoluteString]);
         return %orig(newURL, cachePolicy, timeoutInterval);
     }
     return %orig(URL, cachePolicy, timeoutInterval);
 }
 
 - (NSURL *)URL {
-    NSURL *orig = %orig;
-    NSURL *newURL = PF7RewriteURL(orig);
-    return newURL ?: orig;
+    NSURL *origURL = %orig;
+    NSURL *newURL = PF7RewriteURL(origURL);
+    return newURL ?: origURL;
 }
 
 - (id)mutableCopyWithZone:(struct _NSZone *)zone {
-    id copy = %orig(zone);
-    if ([copy isKindOfClass:%c(NSMutableURLRequest)]) {
-        NSMutableURLRequest *m = (NSMutableURLRequest *)copy;
-        NSURL *newURL = PF7RewriteURL(m.URL);
+    id copyObj = %orig(zone);
+    if ([copyObj isKindOfClass:%c(NSMutableURLRequest)]) {
+        NSMutableURLRequest *reqCopy = (NSMutableURLRequest *)copyObj;
+        NSURL *newURL = PF7RewriteURL([reqCopy URL]);
         if (newURL) {
-            [m setURL:newURL];
+            [reqCopy setURL:newURL];
         }
     }
-    return copy;
+    return copyObj;
 }
 
 %end
@@ -119,7 +113,7 @@ static NSURLRequest *PF7RewriteRequest(NSURLRequest *req) {
 - (void)setURL:(NSURL *)URL {
     NSURL *newURL = PF7RewriteURL(URL);
     if (newURL) {
-        NSLog(@"[PodcastsFix7] setURL rewrite: %@ -> %@", URL.absoluteString, newURL.absoluteString);
+        NSLog(@"[PodcastsFix7] setURL rewrite: %@ -> %@", [URL absoluteString], [newURL absoluteString]);
         %orig(newURL);
         return;
     }

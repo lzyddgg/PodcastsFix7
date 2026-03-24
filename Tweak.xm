@@ -50,22 +50,6 @@ static NSURL *PF7RewriteURL(NSURL *url) {
     return [comp URL];
 }
 
-static NSURLRequest *PF7RewriteRequest(NSURLRequest *req) {
-    if (!req) return req;
-
-    NSURL *oldURL = [req URL];
-    NSURL *newURL = PF7RewriteURL(oldURL);
-    if (!newURL || [newURL isEqual:oldURL]) {
-        return req;
-    }
-
-    NSMutableURLRequest *mutableReq = [req mutableCopy];
-    [mutableReq setURL:newURL];
-    [mutableReq setValue:nil forHTTPHeaderField:@"Host"];
-    NSLog(@"[PodcastsFix7] %@ -> %@", [oldURL absoluteString], [newURL absoluteString]);
-    return mutableReq;
-}
-
 %hook NSURLRequest
 
 + (id)requestWithURL:(NSURL *)URL {

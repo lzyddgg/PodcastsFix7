@@ -19,14 +19,13 @@ jobs:
 
       - name: install theos
         run: |
-          git clone --recursive https://github.com/theos/theos.git $HOME/theos
-          ls -la $HOME/theos
-          ls -la $HOME/theos/makefiles
+          git clone --recursive https://github.com/theos/theos.git "$HOME/theos"
+          ls -la "$HOME/theos"
+          ls -la "$HOME/theos/makefiles"
 
       - name: build
-        env:
-          THEOS: $HOME/theos
         run: |
+          export THEOS="$HOME/theos"
           echo "THEOS=$THEOS"
           make package FINALPACKAGE=1
 

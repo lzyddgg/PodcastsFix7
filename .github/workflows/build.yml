@@ -1,0 +1,34 @@
+name: build
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: checkout
+      uses: actions/checkout@v3
+
+    - name: install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y clang make git perl curl ldid
+
+    - name: install theos
+      run: |
+        git clone --recursive https://github.com/theos/theos.git $HOME/theos
+
+    - name: build
+      env:
+        THEOS: $HOME/theos
+      run: |
+        make package FINALPACKAGE=1
+
+    - name: upload deb
+      uses: actions/upload-artifact@v3
+      with:
+        name: deb-package
+        path: packages/*.deb

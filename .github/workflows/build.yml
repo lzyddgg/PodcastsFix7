@@ -12,22 +12,19 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
 
-      - name: install dependencies
+      - name: install prerequisites
         run: |
           sudo apt update
-          sudo apt install -y clang make git perl curl dpkg-dev xz-utils
+          sudo apt install -y bash curl sudo xz-utils dpkg-dev make perl git clang
 
       - name: install theos
         run: |
-          git clone --recursive https://github.com/theos/theos.git "$HOME/theos"
-          mkdir -p "$HOME/theos/sdks"
-
-      - name: install iPhoneOS SDK
-        run: |
-          curl -L https://github.com/theos/sdks/releases/download/master-146e41f/iPhoneOS9.3.sdk.tar.xz -o /tmp/iPhoneOS9.3.sdk.tar.xz
-          tar -xJf /tmp/iPhoneOS9.3.sdk.tar.xz -C "$HOME/theos/sdks"
-          ls -la "$HOME/theos/sdks"
-          ls -la "$HOME/theos/sdks/iPhoneOS9.3.sdk"
+          export THEOS="$HOME/theos"
+          bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
+          echo "THEOS=$THEOS" >> "$GITHUB_ENV"
+          ls -la "$HOME/theos"
+          ls -la "$HOME/theos/toolchain/linux/iphone/bin" || true
+          ls -la "$HOME/theos/sdks" || true
 
       - name: build
         run: |

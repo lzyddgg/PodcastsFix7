@@ -1,3 +1,8 @@
+THEOS_DEVICE_IP ?= 127.0.0.1
+THEOS_PACKAGE_SCHEME = rootless
+
+export THEOS ?= $(HOME)/theos
+
 TARGET := iphone:clang:latest:7.0
 ARCHS := armv7 arm64
 INSTALL_TARGET_PROCESSES = Podcasts itunesstored
@@ -9,4 +14,4 @@ TWEAK_NAME = PodcastsFix7
 PodcastsFix7_FILES = Tweak.xm
 PodcastsFix7_CFLAGS = -fobjc-arc
 
-include $(THEOS_MAKE_PATH)/tweak.mk
+include $(THEOS)/makefiles/tweak.mk

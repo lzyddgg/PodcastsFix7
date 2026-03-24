@@ -1,0 +1,10 @@
+Package: com.clliu.podcastsfix7
+Name: PodcastsFix7
+Version: 0.0.1-1
+Architecture: iphoneos-arm
+Description: Minimal iOS 7 Podcasts/iTunes podcast endpoint fixer
+Maintainer: Cl Liu
+Author: Cl Liu
+Section: Tweaks
+Depends: mobilesubstrate
+Priority: optional

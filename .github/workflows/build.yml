@@ -1,4 +1,4 @@
-name: build-ios7-arm
+name: build
 
 on:
   push:
@@ -6,126 +6,35 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
-
-    env:
-      THEOS: /home/runner/theos
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: checkout
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
-      - name: Install prerequisites
+      - name: install prerequisites
         run: |
           sudo apt update
-          sudo apt install -y \
-            bash \
-            curl \
-            sudo \
-            xz-utils \
-            dpkg-dev \
-            make \
-            perl \
-            git \
-            clang \
-            file \
-            tar \
-            unzip
+          sudo apt install -y bash curl sudo xz-utils dpkg-dev make perl git clang
 
-      - name: Remove stale Theos dir if exists
+      - name: install theos
         run: |
-          rm -rf "$THEOS"
-
-      - name: Install Theos
-        run: |
+          export THEOS="$HOME/theos"
           bash -c "$(curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos)"
           echo "THEOS=$THEOS" >> "$GITHUB_ENV"
+          ls -la "$HOME/theos"
+          ls -la "$HOME/theos/toolchain/linux/iphone/bin" || true
+          ls -la "$HOME/theos/sdks" || true
 
-      - name: Show environment
+      - name: build
         run: |
+          export THEOS="$HOME/theos"
           echo "THEOS=$THEOS"
-          uname -a
-          clang --version || true
-          make --version || true
-          ls -la "$THEOS" || true
-          ls -la "$THEOS/toolchain" || true
-          ls -la "$THEOS/toolchain/linux/iphone/bin" || true
-          ls -la "$THEOS/sdks" || true
+          make package FINALPACKAGE=1
 
-      - name: Patch project for iOS 7 armv7 build
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          files = [Path("Makefile"), Path("MultitaskingGesturesSettings/Makefile")]
-
-          for p in files:
-              s = p.read_text()
-
-              s = s.replace(" GO_EASY_ON_ME = 1 ", "\nGO_EASY_ON_ME = 1\n")
-              s = s.replace(" include theos/makefiles/common.mk ", "\ninclude $(THEOS)/makefiles/common.mk\n")
-              s = s.replace(" include $(THEOS_MAKE_PATH)/tweak.mk ", "\ninclude $(THEOS_MAKE_PATH)/tweak.mk\n")
-              s = s.replace(" include $(THEOS_MAKE_PATH)/bundle.mk ", "\ninclude $(THEOS_MAKE_PATH)/bundle.mk\n")
-              s = s.replace(" include $(THEOS_MAKE_PATH)/aggregate.mk ", "\ninclude $(THEOS_MAKE_PATH)/aggregate.mk\n")
-              s = s.replace(" SUBPROJECTS += multitaskinggesturessettings ", "\nSUBPROJECTS += multitaskinggesturessettings\n")
-
-              s = s.replace("ARCHS = arm64 armv7s armv7", "ARCHS = armv7 armv7s")
-              s = s.replace("ARCHS := arm64 armv7s armv7", "ARCHS := armv7 armv7s")
-
-              lines = [line.rstrip() for line in s.splitlines() if line.strip() != ""]
-              lines = [line for line in lines if not line.startswith("TARGET") and not line.startswith("TARGET :=")]
-              lines.insert(0, "TARGET := iphone:clang:7.0:7.0")
-
-              p.write_text("\n".join(lines) + "\n")
-          PY
-
-          echo "----- Patched root Makefile -----"
-          cat Makefile
-          echo "----- Patched subproject Makefile -----"
-          cat MultitaskingGesturesSettings/Makefile
-
-      - name: Patch control metadata
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-
-          p = Path("control")
-          s = p.read_text()
-
-          if "Architecture:" in s:
-              s = re.sub(r"Architecture:\s*\S+", "Architecture: iphoneos-arm", s)
-          else:
-              s += "\nArchitecture: iphoneos-arm\n"
-
-          if "Depends:" in s:
-              s = re.sub(r"Depends:\s*.*", "Depends: mobilesubstrate", s)
-          else:
-              s += "\nDepends: mobilesubstrate\n"
-
-          p.write_text(s)
-          PY
-
-          echo "----- control -----"
-          cat control
-
-      - name: Build package
-        run: |
-          export THEOS="$THEOS"
-          make clean package FINALPACKAGE=1 messages=yes
-
-      - name: Inspect package output
-        run: |
-          ls -lah packages || true
-          file packages/* || true
-
-      - name: Upload deb
+      - name: upload deb
         uses: actions/upload-artifact@v4
         with:
-          name: MultitaskingGestures-ios7-arm
+          name: deb-package
           path: packages/*.deb
           if-no-files-found: error
